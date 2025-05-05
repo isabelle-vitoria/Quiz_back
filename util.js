@@ -6,7 +6,7 @@ export async function CriarHash(senha, salts) {
     return hash
 }
 
-export async function CompararHash(senha, hash) {
+/* export async function CompararHash(senha, hash) {
     const teste = await bycrypt.compare(senha, hash);
     if(teste){
         return true
@@ -14,6 +14,4 @@ export async function CompararHash(senha, hash) {
     else{
         return false
     }
-}
-// let hash = await CriarHash('beca123', saltRounds)
-// CompararHash('beca123', hash)'
+} */

@@ -1,104 +1,69 @@
-import express from 'express'
-import cors from 'cors'
+import express from 'express';
+import cors from 'cors';
 import sql from './database.js';
-import { CompararHash, CriarHash } from './util.js'
+import { CriarHash } from './util.js';
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); //middleware que serve para interpretar os dados vindos do corpo da requisição (body)
+                                                 // em requisições do tipo POST, PUT, etc.
+app.use(cors());
 
-//ROTAS LOGIN E CADASTRO
+app.post('/usuario', async (req, res) => {
+  try {
+    const { nome, email, senha } = req.body;
 
-app.post('/login', async (req, res) =>{
-    try{
-    const {email, senha} = req.body;
-
-    const usuario = await sql`select
-    id, senha, funcao from usuarios
-    where email = ${email}`
-    console.log(usuario)
-
-    if(usuario.length == 0){
-        return res.status(401).json('Usuarios ou senha incorretos')
+    // Verifica se o e-mail já está cadastrado
+    const verificacao = await sql`SELECT id FROM usuarios WHERE email = ${email}`;
+    if (verificacao.length > 0) {
+      return res.status(400).json('Email já cadastrado');
     }
 
-    const teste = await CompararHash(senha, usuario[0].senha)
+    // Criptografa a senha
+    const hash = await CriarHash(senha, 10);
 
-    if(teste) {
-        return res.status(200).json(usuario[0])
-    }
-    else{
-        return res.status(401).json('Usuarios ou senha incorreto...')
-    }
-    
-    }
-    catch (error){
-        return res.status(500).json('Error in login')
-    }
-})
+    // Insere o novo usuário
+    await sql`
+      INSERT INTO usuarios (nome, email, senha, funcao)
+      VALUES (${nome}, ${email}, ${hash}, 'aluno')
+    `;
 
-app.post('/usuario', async (req, res) =>{
-    try
-    {
-        const {nome, email, senha} = req.body
-
-        const hash = await CriarHash(senha, 10)
-
-        await sql`insert into usuarios(nome, email, senha, funcao)
-        values (${nome}, ${email}, ${hash}, 'aluno')`;
-
-        return res.status(200).json('Cadastrado com sucesso!')
-    }
-    catch (error){
-        console.log(error)
-        return res.status(500).json('Error to create user')
-    }
-})
-
-//ROTAS QUESTÕES
+    return res.status(201).json('Cadastrado com sucesso!');
+  } catch (error) 
+  {
+    console.error('Erro inesperado:', error);
+    return res.status(500).json('Ocorreu um erro inesperado');
+  }
+});
 
 app.get('/questoes', async (req, res) =>{
-    try{
-        const questao = await sql`SELECT * FROM questoes ORDER BY random() limit 1`
-        return res.status(200).json(questao)
-    }   
-    catch(error){""
-        return res.status(500).json("Erro ao consultar questão")
-    }
+  try{
+      const questao = await sql`SELECT * FROM questoes ORDER BY random() limit 40`
+      return res.status(200).json(questao)
+  }   
+  catch(error){
+      return res.status(500).json("Erro ao consultar questão")
+  }
 })
 
 app.post('/questao/nova', async (req, res) => {
-    try
-    {
-      const { enunciado, materia, dificuldade, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta } = req.body;
-      const insert = await sql `INSERT INTO questoes
-      (enunciado, materia, dificuldade, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta)
-      VALUES (${enunciado}, ${materia}, ${dificuldade}, ${alternativa_a}, ${alternativa_b}, ${alternativa_c}, ${alternativa_d}, ${resposta_correta})`;
-      res.status(200).json('Questão criada com sucesso!');
+  try
+  {
+    const { enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta } = req.body;
+    const insert = await sql `INSERT INTO questoes
+    (enunciado, materia, dificuldade, alternativa_a, alternativa_b, alternativa_c, alternativa_d, resposta_correta)
+    VALUES (${enunciado}, 'fracao', 'medio', ${alternativa_a}, ${alternativa_b}, ${alternativa_c}, ${alternativa_d}, ${resposta_correta})`;
+    res.status(200).json('Questão criada com sucesso!');
+  }
+
+  catch(error){
+    console.log(error)
+    if(error.code == 23505){
+      return res.status(409).json('Erro ao cadastrar')
     }
+    return res.status(500).json('Erro ao cadastrar questão')
+  }});
 
-    catch(error){
-      console.log(error)
-      if(error.code == 23505){
-        return res.status(409).json('Erro ao cadastrar')
-      }
-      return res.status(500).json('Erro ao cadastrar questão')
-    }});
-
-//LEVANTAR A API
-
-app.listen(3000,()=>{
-    console.log('Running!!')
+app.listen(3000, () => {
+  console.log('API está no ar!');
 });
-
-/* app.get('/login/:usuario/:senha', async (req, res)=>{
-    const { usuario, senha } = req.params
-
-    const consulta = await sql`select * from usuarios where
-    email = ${usuario} and senha = ${senha}`
-
-    if(consulta != null && consulta != '')
-        return res.status(200).json(consulta[0].id);
-    else
-        return res.status(401).json('Usuario ou senha incorretos')
-}); */
